@@ -1,11 +1,15 @@
 #include <SPI.h>
 #include <ArduinoMqttClient.h>
 #include <WiFiNINA.h>
+#include <ArduinoBLE.h>
 
 #include "wifi_cred.h"
 
 WiFiClient wifiClient;
 MqttClient mqttClient(wifiClient);
+BLEService pirService("19B10010-E8F2-537E-4F6C-D104768A1214"); // create service
+BLEByteCharacteristic pirCharacteristic("19B10012-E8F2-537E-4F6C-D104768A1214", BLERead | BLENotify);
+
 ///////please enter your sensitive data in the Secret tab/arduino_secrets.h
 char ssid[] = SECRET_SSID;        // your network SSID (name)
 char pass[] = SECRET_PASS;    // your network password (use for WPA, or use as key for WEP)
@@ -13,12 +17,13 @@ int status = WL_IDLE_STATUS;     // the WiFi radio's status
 const int led_pin = 11;
 const int PIn = 2;     // the number of the input pin
 int pirState = 0;
-const char broker[] = "10.13.122.25"; // Address of the MQTT server
-int        port     = 1883;
+const char broker[] = "10.13.122.148"; // Address of the MQTT server
+const int  port     = 1883;
+const int serverPort = 4080;
 const char topic[] = "ToArduino/pir";
 const char topic1[] = "ToHost/pir";
 String msg = "";
-int count =0;
+int count =0; 
 const long interval = 10000;
 unsigned long previousMillis = 0;
 
@@ -43,17 +48,25 @@ void setup() {
     // wait 10 seconds for connection:
     delay(10000);
   }
-
-  // you're connected now, so print out the data:
   Serial.print("You're connected to the network");
   printWifiData();
+  if (!BLE.begin()) {
+    Serial.println("starting Bluetooth® Low Energy module failed!");
+    while (true);
+  }
+  
+  BLE.setLocalName("PIR_status");   // set the local name peripheral advertises
+  BLE.setAdvertisedService(pirService);   // set the UUID for the service this peripheral advertises:
 
+  pirService.addCharacteristic(pirCharacteristic);
+  BLE.addService(pirService);
+  pirCharacteristic.writeValue(0);
+  BLE.advertise();
+  
   mqttClient.setUsernamePassword(Mqtt_User, Mqtt_Pass);
   if (!mqttClient.connect(broker, port)) {
     Serial.print("MQTT connection failed! Error code = ");
     Serial.println(mqttClient.connectError());
-
-    while (1);
   }
   Serial.println("You're connected to the MQTT broker!");
   Serial.println();
@@ -71,7 +84,10 @@ void setup() {
 }
 
 void loop() {
+  BLE.poll();
+  mqttClient.poll();
   pirState = digitalRead(PIn);
+  pirCharacteristic.writeValue(pirState);
   if (pirState == HIGH) {
     // turn LED on:
     digitalWrite(led_pin, HIGH);
@@ -100,8 +116,7 @@ void loop() {
       msg= msg+(char)mqttClient.read();
     }
     Serial.println(msg);
-    
-    if(msg == "ON") {
+    if(msg == "1") {
       digitalWrite(led_pin, HIGH);
     } else {
       digitalWrite(led_pin, LOW);
