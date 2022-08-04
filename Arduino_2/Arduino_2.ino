@@ -1,6 +1,8 @@
 #include <SPI.h>
 #include <ArduinoMqttClient.h>
 #include <WiFiNINA.h>
+#include <ArduinoBLE.h>
+#include <Arduino_JSON.h>
 #include "DHT.h"
 #define DHTPIN 2
 #define DHTTYPE DHT11
@@ -10,22 +12,23 @@ DHT dht(DHTPIN, DHTTYPE);
 
 WiFiClient wifiClient;
 MqttClient mqttClient(wifiClient);
+JSONVar tempObject;
 
 ///////please enter your sensitive data in the Secret tab/arduino_secrets.h
 char ssid[] = SECRET_SSID;        // your network SSID (name)
 char pass[] = SECRET_PASS;    // your network password (use for WPA, or use as key for WEP)
 int status = WL_IDLE_STATUS;     // the WiFi radio's status
 const int led_pin = 11;
-const char broker[] = "10.13.122.25"; // Address of the MQTT server
+const char broker[] = "10.13.122.148"; // Address of the MQTT server
 const int  port     = 1883;
-const int serverPort = 4080;
-const char topic_status[] = "ToArduino/temp_status";
+const char topic_status[] = "ToArduino/temp";
 const char topic_temp[] = "ToArduino/temp_set";
 const char topic1[] = "ToHost/temp";
 String msg = "";
 int count =0;
-float set_temp = 26.0;
-const long interval = 10000;
+int led_state = 0;
+float set_temp = 21.0;
+const long interval = 2000;
 unsigned long previousMillis = 0;
 
 void setup() {
@@ -54,12 +57,14 @@ void setup() {
   Serial.print("You're connected to the network");
   printWifiData();
 
+  /*BLE.begin();
+  Serial.println("Bluetooth® Low Energy Central - LED control");
+  BLE.scanForUuid("19b10000-e8f2-537e-4f6c-d104768a1214");*/
+
   mqttClient.setUsernamePassword(Mqtt_User, Mqtt_Pass);
   if (!mqttClient.connect(broker, port)) {
     Serial.print("MQTT connection failed! Error code = ");
     Serial.println(mqttClient.connectError());
-
-    //while (1);
   }
   Serial.println("You're connected to the MQTT broker!");
   Serial.println();
@@ -73,31 +78,41 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
   dht.begin();
-  //pinMode(PIn, INPUT);
-  
 }
 
 void loop() {
   mqttClient.poll();
+ /* BLEDevice peripheral = BLE.available();
+  if (peripheral.localName() != "PIR_status") {
+      return;
+    }
+  if (peripheral.connect()) {
+    Serial.println("Connected");
+  }
+  if (peripheral.discoverAttributes()) {
+    Serial.println("Attributes discovered");
+  }
+  BLE.stopScan();
+  BLECharacteristic pirCharacteristic = peripheral.characteristic("19b10001-e8f2-537e-4f6c-d104768a1214");
+  if (pirCharacteristic.value()){
+    digitalWrite(LED_BUILTIN, HIGH);
+  }*/
   float temp = dht.readTemperature();
   float humidity = dht.readHumidity();
+  led_state = digitalRead(LED_BUILTIN);
   if (isnan(humidity) || isnan(temp)) {
     Serial.println(F("Failed to read from DHT sensor!"));
     return;
   }
-  if (temp > set_temp) {
+  if (temp >= set_temp && led_state==HIGH) {
     digitalWrite(LED_BUILTIN, LOW);
-    Serial.print("Heater Switched OFF");
+    //Serial.print("Heater Switched OFF");
   }
+
   unsigned long currentMillis = millis();
-  if (currentMillis - previousMillis >= interval) {
-    Serial.println(temp);
-    Serial.println(humidity);
+  if (currentMillis - previousMillis >= interval) { 
     previousMillis = currentMillis;
-    mqttClient.beginMessage(topic1);
-    mqttClient.print(digitalRead(LED_BUILTIN));
-    mqttClient.endMessage();
-    //count++;
+    send_status(temp, humidity);
   }
   int messageSize = mqttClient.parseMessage();
   if (messageSize) {
@@ -118,7 +133,7 @@ void loop() {
       set_temp = msg.toFloat();
     }
     else{
-      if(msg == "ON") {
+      if(msg == "1") {
         digitalWrite(LED_BUILTIN, HIGH);
       }else {
         digitalWrite(LED_BUILTIN, LOW);
@@ -126,6 +141,9 @@ void loop() {
     }
     msg="";
   }
+ // if (!peripheral.connected()) {
+  //  BLE.scanForUuid("19b10000-e8f2-537e-4f6c-d104768a1214");
+  //}
   //delay(10000);
   //printWifiData();
 }
@@ -139,7 +157,17 @@ void loop() {
     digitalWrite(led_pin, LOW);
   }
 }*/
-
+void send_status(){
+   tempObject["ctemp"]=temp;
+   tempObject["humidity"]=humidity;
+   tempObject["stemp"]=set_temp;
+   tempObject["status"]=digitalRead(LED_BUILTIN);
+   String jsonString = JSON.stringify(tempObject);
+   Serial.println(jsonString);
+   mqttClient.beginMessage(topic1);
+   mqttClient.print(jsonString);
+   mqttClient.endMessage();
+}
 void printWifiData() {
   // print your board's IP address:
   IPAddress ip = WiFi.localIP();
