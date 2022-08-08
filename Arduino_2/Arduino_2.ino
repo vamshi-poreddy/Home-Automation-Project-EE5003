@@ -29,11 +29,11 @@ const char topic1[] = "ToHost/temp";
 String msg = "";
 int count =0;
 int led_state = 0;
-float set_temp = 25.0;
+float set_temp = 27.0;
 const long interval = 2000;
 const long mqtt_check = 10000*12;
 unsigned long previousMillis = 0;
-unsigned long previousMillis1 = 10000*12;
+unsigned long previousMillis1 = 0;
 int mqtt_status;
 int ble_status;
 const int subscribeQos = 1;
@@ -50,9 +50,10 @@ void setup() {
     // don't continue
     while (true);
   }
-  wifi_ble();
   pinMode(led_pin, OUTPUT);
+  pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(led_pin, LOW);
+  wifi_ble();
   dht.begin();
 }
 
@@ -83,7 +84,7 @@ void loop() {
       peripheral_ble();
     }
     else{
-      WiFi.disconnect();
+      //WiFi.disconnect();
       wifi_ble();
     }
     //unsigned long currentMillis = millis();
@@ -129,6 +130,7 @@ void peripheral_ble(){
   ble_func(peripheral);
   }
   BLE.scanForUuid("19B10000-E8F2-537E-4F6C-D104768A1214");
+  delay(5000);
 }
 void ble_func(BLEDevice peripheral){
   Serial.println("Entered Ble func");
@@ -149,6 +151,15 @@ void ble_func(BLEDevice peripheral){
     digitalWrite(led_pin, LOW);
     //Serial.print("Heater Switched OFF");
   }
+  /*if (millis() - previousMillis1 >= 3*60*1000UL) 
+  {
+   Serial.println(WiFi.status());
+   previousMillis1 = millis();  //get ready for the next iteration
+   BLE.disconnect();
+   BLE.end();
+   delay(5000);
+   wifi_ble();
+  }*/
   }
   if (!peripheral.connected()) {
     BLE.scanForUuid("19B10000-E8F2-537E-4F6C-D104768A1214");
@@ -169,13 +180,14 @@ void send_status(float temp, float humidity){
    mqttClient.print(jsonString);
    mqttClient.endMessage();
 }
-
+ 
 void wifi_ble(){
   // attempt to connect to WiFi network:
   while (status != WL_CONNECTED) {
     Serial.print("Attempting to connect to WPA SSID: ");
     Serial.println(ssid);
     // Connect to WPA/WPA2 network:
+    Serial.println(status);
     status = WiFi.begin(ssid, pass);
     // wait 10 seconds for connection:
     delay(5000);
@@ -185,9 +197,15 @@ void wifi_ble(){
   printWifiData();
   mqttClient.setUsernamePassword(Mqtt_User, Mqtt_Pass);
   if (!mqttClient.connect(broker, port)) {
+    //WiFi.disconnect();
+    delay(2000);
+    WiFi.end();
+    status = WL_IDLE_STATUS;
+    delay(2000);
     Serial.print("MQTT connection failed! Error code = ");
     Serial.println(mqttClient.connectError());
     BLE.begin();
+    digitalWrite(LED_BUILTIN, HIGH);
     //BLE.setEventHandler(BLEDiscovered, ble_func);
     Serial.println("Bluetooth® Low Energy Central - LED control");
     BLE.scanForUuid("19B10000-E8F2-537E-4F6C-D104768A1214");
@@ -200,6 +218,7 @@ void wifi_ble(){
   else{
     mqtt_status = 1;
     ble_status = 0;
+    digitalWrite(LED_BUILTIN, LOW);
     Serial.println("You're connected to the MQTT broker!");
     Serial.println();
     Serial.print("Subscribing to topics: ");
