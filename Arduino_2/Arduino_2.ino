@@ -126,18 +126,21 @@ void peripheral_ble(){
     Serial.println("Attributes discovered");
   }
   //pirCharacteristic = peripheral.characteristic("19B10001-E8F2-537E-4F6C-D104768A1214");
-  }
   ble_func(peripheral);
+  }
+  BLE.scanForUuid("19B10000-E8F2-537E-4F6C-D104768A1214");
 }
 void ble_func(BLEDevice peripheral){
-  //Serial.println("Entered Ble func");
+  Serial.println("Entered Ble func");
+  //peripheral.connect();
   while(peripheral.connected()){
-    BLE.poll();
-    pirCharacteristic = peripheral.characteristic("19B10001-E8F2-537E-4F6C-D104768A1214");
-  //byte valued;
-  //pirCharacteristic.readValue(valued);
-  //Serial.println(valued);
-  if (pirCharacteristic.value() && led_pin == LOW){
+  BLE.poll();
+  pirCharacteristic = peripheral.characteristic("19B10001-E8F2-537E-4F6C-D104768A1214");
+  byte valued;
+  pirCharacteristic.readValue(valued);
+  Serial.println(valued);
+  led_state = digitalRead(led_pin);
+  if (valued && (led_state == 0)){
     //Serial.println("entered");
     digitalWrite(led_pin, HIGH);
   }
@@ -185,8 +188,10 @@ void wifi_ble(){
     Serial.print("MQTT connection failed! Error code = ");
     Serial.println(mqttClient.connectError());
     BLE.begin();
+    //BLE.setEventHandler(BLEDiscovered, ble_func);
     Serial.println("Bluetooth® Low Energy Central - LED control");
     BLE.scanForUuid("19B10000-E8F2-537E-4F6C-D104768A1214");
+    delay(5000);
     //peripheral_ble();
     ble_status = 1;
     mqtt_status =0;
