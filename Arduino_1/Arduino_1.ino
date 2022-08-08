@@ -7,8 +7,8 @@
 
 WiFiClient wifiClient;
 MqttClient mqttClient(wifiClient);
-BLEService pirService("19B10010-E8F2-537E-4F6C-D104768A1214"); // create service
-BLEByteCharacteristic pirCharacteristic("19B10012-E8F2-537E-4F6C-D104768A1214", BLERead | BLENotify);
+BLEService pirService("19B10000-E8F2-537E-4F6C-D104768A1214"); // create service
+BLEByteCharacteristic pirCharacteristic("19B10001-E8F2-537E-4F6C-D104768A1214", BLERead | BLENotify);
 
 ///////please enter your sensitive data in the Secret tab/arduino_secrets.h
 char ssid[] = SECRET_SSID;        // your network SSID (name)
@@ -19,13 +19,17 @@ const int PIn = 2;     // the number of the input pin
 int pirState = 0;
 const char broker[] = "10.13.122.148"; // Address of the MQTT server
 const int  port     = 1883;
-const int serverPort = 4080;
+//const int serverPort = 4080;
 const char topic[] = "ToArduino/pir";
-const char topic1[] = "ToHost/pir";
+const char topic_pir[] = "FromArduino/pir";
 String msg = "";
 int count =0; 
+int ble_status=0;
 const long interval = 10000;
+const long mqtt_check = 10000*12;
 unsigned long previousMillis = 0;
+unsigned long previousMillis1 = 10000*12;
+int timer;
 
 void setup() {
   //Initialize serial and wait for port to open:
@@ -33,12 +37,59 @@ void setup() {
   //while (!Serial) {
     ; // wait for serial port to connect. Needed for native USB port only
   //}
-  // check for the WiFi module:
-  if (WiFi.status() == WL_NO_MODULE) {
-    Serial.println("Communication with WiFi module failed!");
-    // don't continue
-    while (true);
+  wifi_ble();
+  pinMode(led_pin, OUTPUT);
+  digitalWrite(led_pin, LOW);
+  pinMode(PIn, INPUT);
+}
+
+void loop() {
+  pirState = digitalRead(PIn);
+  if(pirState == HIGH){
+    digitalWrite(led_pin, HIGH);
+    timer =1;
   }
+  if(timer){
+    unsigned long currentMillis = millis();
+    if (currentMillis - previousMillis >= interval) {
+    previousMillis = currentMillis;
+    digitalWrite(led_pin, LOW);
+  }
+  }
+  //Serial.println(mqttClient.connected());
+  if(mqttClient.connected()){
+    mqtt_func();
+  }
+  else{
+    if(!ble_status){
+      WiFi.disconnect();
+      wifi_ble();
+    }
+    BLE.poll();
+    BLEDevice central = BLE.central();
+    if(central.connected()){
+      pirCharacteristic.writeValue(pirState);
+    }
+   // unsigned long currentMillis = millis();
+    //if (currentMillis - previousMillis1 >= mqtt_check){
+     // previousMillis1 = currentMillis;
+      //wifi_ble();
+    //}
+  }
+}
+
+void mqtt_func(){
+  mqttClient.poll();
+  if (pirState == HIGH) {
+    bool retained = false;
+    int qos = 1;
+    bool dup = false;
+    mqttClient.beginMessage(topic_pir, pirState, retained, qos, dup);
+    mqttClient.print(pirState);
+    mqttClient.endMessage();
+  }
+}
+void wifi_ble(){
   // attempt to connect to WiFi network:
   while (status != WL_CONNECTED) {
     Serial.print("Attempting to connect to WPA SSID: ");
@@ -46,64 +97,40 @@ void setup() {
     // Connect to WPA/WPA2 network:
     status = WiFi.begin(ssid, pass);
     // wait 10 seconds for connection:
-    delay(10000);
+    delay(5000);
   }
-  Serial.print("You're connected to the network");
+  // you're connected now, so print out the data:
+  Serial.print("You're connected to the network ");
   printWifiData();
-  if (!BLE.begin()) {
-    Serial.println("starting Bluetooth® Low Energy module failed!");
-    while (true);
-  }
-  
-  BLE.setLocalName("PIR_status");   // set the local name peripheral advertises
-  BLE.setAdvertisedService(pirService);   // set the UUID for the service this peripheral advertises:
-
-  pirService.addCharacteristic(pirCharacteristic);
-  BLE.addService(pirService);
-  pirCharacteristic.writeValue(0);
-  BLE.advertise();
-  
   mqttClient.setUsernamePassword(Mqtt_User, Mqtt_Pass);
   if (!mqttClient.connect(broker, port)) {
-    Serial.print("MQTT connection failed! Error code = ");
-    Serial.println(mqttClient.connectError());
-  }
-  Serial.println("You're connected to the MQTT broker!");
-  Serial.println();
-
-  Serial.print("Subscribing to topic: ");
-  Serial.println(topic);
-  Serial.println();
-
-  // subscribe to a topic
-  mqttClient.subscribe(topic);
-  pinMode(led_pin, OUTPUT);
-  digitalWrite(led_pin, LOW);
-  //pinMode(PIn, INPUT);
-  
-}
-
-void loop() {
-  BLE.poll();
-  mqttClient.poll();
-  pirState = digitalRead(PIn);
-  pirCharacteristic.writeValue(pirState);
-  if (pirState == HIGH) {
-    // turn LED on:
-    digitalWrite(led_pin, HIGH);
-    unsigned long currentMillis = millis();
-    if (currentMillis - previousMillis >= interval) {
-      previousMillis = currentMillis;
-    mqttClient.beginMessage(topic1);
-    mqttClient.print("HIGH");
-    mqttClient.endMessage();
-    //count++;
+     if (!BLE.begin()) {
+      Serial.println("starting Bluetooth® Low Energy module failed!");
+      while (true);
     }
+    BLE.setLocalName("PIR_status");   // set the local name peripheral advertises
+    BLE.setAdvertisedService(pirService);   // set the UUID for the service this peripheral advertises:
+    pirService.addCharacteristic(pirCharacteristic);
+    BLE.addService(pirService);
+    pirCharacteristic.writeValue(0);
+    BLE.advertise();
+    Serial.print("BLE started");
+    ble_status = 1;
+    delay(5000);
   }
   else{
-  int messageSize = mqttClient.parseMessage();
-  if (messageSize) {
-    int i =0;
+    Serial.println("You're connected to the MQTT broker!");
+    Serial.println();
+    Serial.print("Subscribing to topics: ");
+    Serial.println();
+    mqttClient.onMessage(onMqttMessage);
+  // subscribe to a topic
+    // subscribe to a topic
+    mqttClient.subscribe(topic,1);
+    ble_status=0;
+  }
+}
+void onMqttMessage(int messageSize){
     // we received a message, print out the topic and contents
     Serial.print("Received a message with topic '");
     Serial.print(mqttClient.messageTopic());
@@ -116,29 +143,14 @@ void loop() {
       msg= msg+(char)mqttClient.read();
     }
     Serial.println(msg);
-    if(msg == "1") {
+    if(msg == "ON") {
       digitalWrite(led_pin, HIGH);
+      timer =0;
     } else {
       digitalWrite(led_pin, LOW);
     }
     msg="";
-  }
-  //delay(10000);
-  //Sensor_Status();
-  //printWifiData();
 }
-}
-/*void Sensor_Status(){
-  pirState = digitalRead(PIn);
-  if (pirState == HIGH) {
-    // turn LED on:
-    digitalWrite(led_pin, HIGH);
-  } else {
-    // turn LED off:
-    digitalWrite(led_pin, LOW);
-  }
-}*/
-
 void printWifiData() {
   // print your board's IP address:
   IPAddress ip = WiFi.localIP();
