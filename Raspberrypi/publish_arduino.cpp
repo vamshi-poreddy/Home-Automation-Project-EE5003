@@ -13,7 +13,7 @@ using namespace std;
 #define AUTHTOKEN "greninja"
 #define TOPIC1 "ToArduino/pir"
 #define TOPIC2 "ToArduino/temp"
-#define QOS 0
+#define QOS 1
 #define TIMEOUT 10000L
 int count= 1;
 volatile MQTTClient_deliveryToken deliveredtoken;
@@ -42,8 +42,6 @@ void to_arduino(int state, const char* TOPIC){
 	cout << "Failed to connect, return code " << rc << endl;
 	}
 	MQTTClient_publishMessage(client, TOPIC, &pubmsg, &token);
-	delay(1000);
-	MQTTClient_publishMessage(client, TOPIC, &pubmsg, &token);
 	MQTTClient_disconnect(client, 1000);
 	MQTTClient_destroy(&client);
 }
@@ -56,12 +54,12 @@ int main(){
 	pinMode(6,OUTPUT);
 	int led_state = digitalRead(5);
 	int heater_state = digitalRead(6);
-	cout<<led_state<<endl;
-	cout<<heater_state<<endl;
+	//cout<<led_state<<endl;
+	//cout<<heater_state<<endl;
 	while(1){
 		if(led_state!=digitalRead(5)){
 			led_state=digitalRead(5);
-			cout<<led_state<<endl;
+			//cout<<led_state<<endl;
 			to_arduino(led_state, TOPIC1);
 			//thread th1(to_arduino, led_state);
 			//this_thread::sleep_for(chrono::milliseconds(200));
@@ -69,7 +67,7 @@ int main(){
 		}
 		if(heater_state!=digitalRead(6)){
 			heater_state=digitalRead(6);
-			cout<<heater_state<<endl;
+			//cout<<heater_state<<endl;
 			to_arduino(heater_state, TOPIC2);
 			//thread th2(to_arduino, heater_state);
 			//th2.join();

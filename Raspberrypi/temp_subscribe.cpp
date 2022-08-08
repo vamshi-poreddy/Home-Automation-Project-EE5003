@@ -12,7 +12,7 @@ using namespace std;
 #define AUTHMETHOD "rphost"
 #define AUTHTOKEN "greninja"
 #define TOPIC "ToHost/temp"
-#define QOS 0
+#define QOS 1
 #define TIMEOUT 10000L
 int count= 1;
 volatile MQTTClient_deliveryToken deliveredtoken;
@@ -51,6 +51,8 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 
    MQTTClient_freeMessage(&message);
    MQTTClient_free(topicName);
+   if(wiringPiSetup()==-1)
+		cout<<"Failed to read"<<endl;
 
    pinMode(6,OUTPUT);
 	if(json_object_get_int(status))

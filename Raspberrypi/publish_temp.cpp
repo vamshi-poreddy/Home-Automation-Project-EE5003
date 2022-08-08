@@ -29,7 +29,7 @@ int main(){
 	
 	float temp=0;
 	while(temp<10 || temp >30){
-	cout<<"Enter the preferred room temperature between 10 to 30 degrees:";
+	cout<<"Enter the preferred room temperature between 10 to 30 degrees:"<<endl;
 	cin>>temp;
 	if(temp<10 || temp >30)
 		cout<<"Invalid input please enter temparature value within range 10 and 30"<<endl;
@@ -48,11 +48,12 @@ int main(){
 	pubmsg.retained = 0;
 	
 	MQTTClient_publishMessage(client, TOPIC, &pubmsg, &token);
-	delay(2000);
-	MQTTClient_publishMessage(client, TOPIC, &pubmsg, &token);
-	cout << "Waiting for up to " << (int)(TIMEOUT/1000) <<" seconds for publication of " << temp_str <<" \non topic " << TOPIC << " for ClientID: " << CLIENTID << endl;
+	//delay(2000);
+	//MQTTClient_publishMessage(client, TOPIC, &pubmsg, &token);
+	//cout << "Waiting for up to " << (int)(TIMEOUT/1000) <<" seconds for publication of " << temp_str <<" \non topic " << TOPIC << " for ClientID: " << CLIENTID << endl;
 	rc = MQTTClient_waitForCompletion(client, token, TIMEOUT);
-	cout << "Temperature with token " << (int)token << " delivered." << endl;
+	//cout << "Message with token " << (int)token << " delivered." << endl;
+	cout<<"Threshold temperature Published, Please check Sensor status in User Widgets"<<endl;
 	MQTTClient_disconnect(client, 5000);
 	MQTTClient_destroy(&client);
 	return rc;
