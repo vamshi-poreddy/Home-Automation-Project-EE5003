@@ -37,7 +37,7 @@ def send_email():
     smtp.starttls()
     smtp.ehlo()
     #logging into email using email address and apppassword
-    smtp.login(email_add, "qurucfqrrrgjfvmh")
+    smtp.login(email_add, email_pass)
     subject = "Alert"
     body = "Intruder detected! Please check the images uploaded to drive"
     msg = "Subject: {}\n\n{}".format(subject,body)
@@ -47,7 +47,7 @@ def send_email():
     smtp.quit()
     
 email_add = "poreddyvamshidharreddy@gmail.com" #sender and reciever email address same in my case
-#email_pass = os.environ.get('Email_Pass') #password obtained from os environment variable for privacy
+email_pass = os.environ.get('Email_Pass') #password obtained from os environment variable for privacy
 #Initialize 'currentname' to trigger only when a new person is identified.
 currentname = "Unknown"
 #Determine faces from encodings.pickle file model created from train_model.py
