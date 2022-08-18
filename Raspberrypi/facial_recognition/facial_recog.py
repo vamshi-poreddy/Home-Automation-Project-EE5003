@@ -6,7 +6,48 @@ import imutils
 import pickle
 import time
 import cv2
+from googleapiclient.http import MediaFileUpload
+from Google import Create_Service
+import smtplib
 
+#function for Uploading the image to drive
+def drive_upload(img_name):
+    cf = '/home/pi/client_secret.json'#Authentication file from google OAuth
+    apin = 'drive'
+    apiver = 'v3'
+    #adress of drive based on google API
+    Scopes = ['https://www.googleapis.com/auth/drive']
+
+    service = Create_Service(cf,apin,apiver,Scopes)
+
+    folder_id='1lxOqdwSpn1pIMLfmBi0yZNXg0b5Hd6o_'#ID of the google drive folder
+    file_name = img_name
+    mime_type = 'image/jpeg'
+    file_metadata = {'name':file_name,'parents':[folder_id]}
+    media = MediaFileUpload('{0}'.format(file_name),mimetype=mime_type)#formatting the media file with type of data
+
+    #uploading the file to specified drive folder
+    service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+
+def send_email():
+    #setting up the port and service address using smtp package
+    smtp = smtplib.SMTP('smtp.gmail.com',587)
+    smtp.ehlo()
+    #starting the tls protocol for the smtp server
+    smtp.starttls()
+    smtp.ehlo()
+    #logging into email using email address and apppassword
+    smtp.login(email_add, "qurucfqrrrgjfvmh")
+    subject = "Alert"
+    body = "Intruder detected! Please check the images uploaded to drive"
+    msg = "Subject: {}\n\n{}".format(subject,body)
+    #sending the email with subject and body
+    smtp.sendmail(email_add,email_add, msg)
+    print("Message Sent")
+    smtp.quit()
+    
+email_add = "poreddyvamshidharreddy@gmail.com" #sender and reciever email address same in my case
+#email_pass = os.environ.get('Email_Pass') #password obtained from os environment variable for privacy
 #Initialize 'currentname' to trigger only when a new person is identified.
 currentname = "Unknown"
 #Determine faces from encodings.pickle file model created from train_model.py
@@ -23,6 +64,7 @@ data = pickle.loads(open(encodingsP, "rb").read())
 # src = 2 : I had to set it to 2 inorder to use the USB webcam attached to my laptop
 vs = VideoStream(src=0,framerate=10).start() #for raspberry pi code tested for src=0 
 time.sleep(2.0)
+prev_sec = 0;
 
 # start the FPS counter
 fps = FPS().start()
@@ -41,7 +83,7 @@ while True:
 
     # loop over the facial embeddings
     for encoding in encodings:
-        # attempt to match each face in the input image to our known encodings
+        # attempt to match each face in the input image to our trained encodings
         matches = face_recognition.compare_faces(data["encodings"],encoding)
         name = "Unknown" #if face is not recognized, then print Unknown
 
@@ -65,9 +107,20 @@ while True:
             name = max(counts, key=counts.get)
 
             #If someone in your dataset is identified, print their name on the screen
-            if currentname != name:
-                currentname = name
-                print(currentname)
+        if currentname == name:
+            #currentname = name
+            print(currentname)
+            #Take a picture to send in the email
+            img_name = "image_{}.jpg".format(time.ctime(time.time()))
+            cv2.imwrite(img_name, frame)
+            #capturing the frame and loading it into img_name for drive upload
+            print('Taking a picture.')
+            request = drive_upload(img_name)
+            #calling the dive upload function
+            #To avoid spamming email is sent once every 60 sec but the interval can be changed
+            if time.time()-prev_sec >= 60:
+                prev_sec = time.time();
+                send_email();
         
         # update the list of names
         names.append(name)
@@ -95,6 +148,6 @@ fps.stop()
 print("[INFO] elasped time: {:.2f}".format(fps.elapsed()))
 print("[INFO] approx. FPS: {:.2f}".format(fps.fps()))
 
-# do a bit of cleanup
+# Stopping the camera and closing the window
 cv2.destroyAllWindows()
 vs.stop()

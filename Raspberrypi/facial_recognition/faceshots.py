@@ -1,8 +1,8 @@
 import cv2
 
-name = 'Vamshi' #Name of the person taking picture must be same name as folder in dataset
+name = 'Pervej' #Name of the person taking picture must be same name as folder in dataset
 
-cam = cv2.VideoCapture(0)
+cam = cv2.VideoCapture(0)   #Opening the camera module
 
 cv2.namedWindow("press space to take a photo", cv2.WINDOW_NORMAL)#Opening window with camera
 cv2.resizeWindow("press space to take a photo", 500, 300)#size of the window
@@ -18,16 +18,14 @@ while True:
 
     k = cv2.waitKey(1) #waiting forkeyboard key to be pressed
     if k%256 == 27:#Exit if Esc key is pressed
-        # ESC pressed
         print("Escape hit, closing...")
         break
-    elif k%256 == 32:#space to take capture the frame
-        # SPACE pressed
+    elif k%256 == 32:#space to capture the frame
         img_name = "dataset/"+ name +"/image_{}.jpg".format(img_counter)
         cv2.imwrite(img_name, frame) #Captured frame and asved in dataset folder
         print("{} written!".format(img_name))
         img_counter += 1
 
-cam.release()
+cam.release() #releasing the camera module
 
-cv2.destroyAllWindows()
+cv2.destroyAllWindows() # CLosing the opened window
