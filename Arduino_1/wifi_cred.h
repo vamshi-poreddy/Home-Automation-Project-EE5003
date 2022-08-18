@@ -1,4 +1,4 @@
-#define SECRET_SSID "Vesta TTN"
-#define SECRET_PASS "Volvos7243\\dully"
-#define Mqtt_User "rphost"
-#define Mqtt_Pass "greninja"
+#define SECRET_SSID "YOUR_WIFI_SSID"
+#define SECRET_PASS "YOUR_WIFI_PASSWORD"
+#define Mqtt_User "MQTT_Borker_Username"
+#define Mqtt_Pass "MQTT_Broker_Password"
